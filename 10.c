@@ -1,44 +1,38 @@
-#include<stdio.h>
-#include<stdlib.h>
-#include<time.h>
-#include<mpi.h>
-int main(int argc, char* argv[])
+#include <stdio.h>
+#include <mpi.h>
+
+int main(int argc, char *argv[])
 {
-	int numtasks, rank, rc, count, next, prev, sz, inmsg;
-	MPI_Status Stat;
-	time_t st, et;
-	MPI_Init(&argc, &argv);
-	MPI_Comm_size(MPI_COMM_WORLD, &numtasks);
-	sz = (numtasks / 2) * 2;
-	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-	st = clock();
-	if (rank == 0) prev = sz - 1;
-	else prev = rank - 1;
-	if (rank == sz - 1) next = 0;
-	else next = rank + 1;
-	if (rank % 2 == 0 && rank < sz) {
-		rc = MPI_Send(&rank, 1, MPI_INT, next, 0, MPI_COMM_WORLD);
-		rc = MPI_Recv(&inmsg, 1, MPI_INT, prev, 1, MPI_COMM_WORLD, &Stat);
-	}
-	else if (rank % 2 == 1 && rank < sz) {
-		rc = MPI_Recv(&inmsg, 1, MPI_INT, prev, 0, MPI_COMM_WORLD, &Stat);
-		rc = MPI_Send(&rank, 1, MPI_INT, next, 1, MPI_COMM_WORLD);
-	}
-	MPI_Barrier(MPI_COMM_WORLD);
-	et = clock();
-	if(rank==0) printf("Time taken by Blocking send/receive : %lf\n", (double)(et - st) / CLOCKS_PER_SEC);
-	MPI_Barrier(MPI_COMM_WORLD);
-	MPI_Request reqs[2];
-	MPI_Status stats[2];
-	st = clock();
-	if (rank == numtasks - 1) next = 0;
-	else next = rank + 1;
-	if (rank == 0) prev = numtasks - 1;
-	else prev = rank - 1;
-	MPI_Irecv(&inmsg, 1, MPI_INT, prev, 0, MPI_COMM_WORLD, &reqs[0]);
-	MPI_Isend(&rank, 1, MPI_INT, next, 0, MPI_COMM_WORLD, &reqs[1]);
-	MPI_Barrier(MPI_COMM_WORLD);
-	et = clock();
-	if (rank == 0) printf("Time taken by NonBlocking send/receive : %lf\n", (double)(et - st) / CLOCKS_PER_SEC);
-	MPI_Finalize();
+    MPI_Init(&argc, &argv);
+
+    int rank, size;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    MPI_Comm_size(MPI_COMM_WORLD, &size);
+
+    int send_msg = rank;
+    int recv_msg;
+
+    // Blocking communication using MPI_Send and MPI_Recv
+    MPI_Send(&send_msg, 1, MPI_INT, (rank + 1) % size, 0, MPI_COMM_WORLD);
+    MPI_Recv(&recv_msg, 1, MPI_INT, (rank - 1 + size) % size, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+
+    printf("Rank %d received a message using blocking communication: %d\n", rank, recv_msg);
+
+    // Non-blocking communication using MPI_Isend and MPI_Irecv
+    MPI_Request request;
+    MPI_Isend(&send_msg, 1, MPI_INT, (rank + 1) % size, 1, MPI_COMM_WORLD, &request);
+
+    // Perform some computation while waiting for the message
+    printf("Rank %d performing computation...\n", rank);
+
+    MPI_Irecv(&recv_msg, 1, MPI_INT, (rank - 1 + size) % size, 1, MPI_COMM_WORLD, &request);
+
+    // Wait for both the send and receive operations to complete
+    MPI_Wait(&request, MPI_STATUS_IGNORE);
+
+    printf("Rank %d received a message using non-blocking communication: %d\n", rank, recv_msg);
+
+    MPI_Finalize();
+
+    return 0;
 }
