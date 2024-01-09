@@ -1,37 +1,29 @@
 #include <stdio.h>
-#include <stdlib.h>
 #include <mpi.h>
-#define SIZE 16
-#define UP 0
-#define DOWN 1
-#define LEFT 2
-#define RIGHT 3
-int main(int argc, char* argv[])
+
+int main(int argc, char *argv[])
 {
-	int numtasks, rank, source, dest, outbuf, i, tag = 1, inbuf[4] = { MPI_PROC_NULL,MPI_PROC_NULL,MPI_PROC_NULL,MPI_PROC_NULL, }, nbrs[4], dims[2] = { 4, 4 }, periods[2] = { 0, 0 }, reorder = 0, coords[2];
-	MPI_Request reqs[8];
-	MPI_Status stats[8];
-	MPI_Comm cartcomm;
-	MPI_Init(&argc, &argv);
-	MPI_Comm_size(MPI_COMM_WORLD, &numtasks);
-	if (numtasks == SIZE) {
-		MPI_Cart_create(MPI_COMM_WORLD, 2, dims, periods, reorder, &cartcomm);
-		MPI_Comm_rank(cartcomm, &rank);
-		MPI_Cart_coords(cartcomm, rank, 2, coords);
-		MPI_Cart_shift(cartcomm, 0, 1, &nbrs[UP], &nbrs[DOWN]);
-		MPI_Cart_shift(cartcomm, 1, 1, &nbrs[LEFT], &nbrs[RIGHT]);
-		printf("rank= %d coords= %d %d neighbors(u,d,l,r)= %d %d %d %d\n", rank, coords[0], coords[1], nbrs[UP], nbrs[DOWN], nbrs[LEFT], nbrs[RIGHT]);
-		outbuf = rank;
-		for (i = 0; i < 4; i++) {
-			dest = nbrs[i];
-			source = nbrs[i];
-			MPI_Isend(&outbuf, 1, MPI_INT, dest, tag, MPI_COMM_WORLD, &reqs[i]);
-			MPI_Irecv(&inbuf[i], 1, MPI_INT, source, tag, MPI_COMM_WORLD, &reqs[i + 4]);
-		}
-		MPI_Waitall(8, reqs, stats);
-		printf("rank= %d inbuf(u,d,l,r)= %d %d %d %d\n", rank, inbuf[UP], inbuf[DOWN], inbuf[LEFT], inbuf[RIGHT]);
-	}
-	else
-		printf("Must specify %d tasks. Terminating.\n", SIZE);
-	MPI_Finalize();
+    MPI_Init(&argc, &argv);
+
+    int rank, size;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    MPI_Comm_size(MPI_COMM_WORLD, &size);
+
+    int dims[] = {2, 2}, coords[2];
+    MPI_Comm cart_comm;
+    MPI_Cart_create(MPI_COMM_WORLD, 2, dims, (int[]){1, 0}, 1, &cart_comm);
+    MPI_Cart_coords(cart_comm, rank, 2, coords);
+
+    printf("Rank %d: Coordinates (%d, %d)\n", rank, coords[0], coords[1]);
+
+    int left, right, up, down;
+    MPI_Cart_shift(cart_comm, 0, 1, &up, &down);
+    MPI_Cart_shift(cart_comm, 1, 1, &left, &right);
+
+    printf("Rank %d: Up: %d, Down: %d, Left: %d, Right: %d\n", rank, up, down, left, right);
+
+    MPI_Comm_free(&cart_comm);
+    MPI_Finalize();
+
+    return 0;
 }
